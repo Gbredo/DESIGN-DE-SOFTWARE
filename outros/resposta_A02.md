@@ -153,17 +153,111 @@ public class BeneficiosEspecialista implements PoliticaBeneficios {
 ### B. Abstração de Formatação (OCP e SRP)
 
 ```java
+// O Contrato (Interface) adaptado para o domínio de RH
+public interface ExportadorRelatorio {
+    void exportar(String nomeFuncionario, double salarioLiquido);
+}
 
+// Extensão 1
+public class ExportadorPDF implements ExportadorRelatorio {
+    @Override
+    public void exportar(String nomeFuncionario, double salarioLiquido) {
+        System.out.println("Gerando PDF -> Funcionário: " + nomeFuncionario + " | Salário: " + salarioLiquido);
+    }
+}
+
+// Extensão 2
+public class ExportadorCSV implements ExportadorRelatorio {
+    @Override
+    public void exportar(String nomeFuncionario, double salarioLiquido) {
+        // Simulando a gravação limpa no disco
+        System.out.println("Gravando CSV: " + nomeFuncionario + ";" + salarioLiquido);
+    }
+}
+
+// Extensão 3: A Nova Exigência do Memorando!
+public class ExportadorXML implements ExportadorRelatorio {
+    @Override
+    public void exportar(String nomeFuncionario, double salarioLiquido) {
+        System.out.println("<relatorio>");
+        System.out.println("  <funcionario>" + nomeFuncionario + "</funcionario>");
+        System.out.println("  <salario>" + salarioLiquido + "</salario>");
+        System.out.println("</relatorio>");
+    }
+}
+```
+
+```java
+public class GeradorRelatorioRH {
+    private ExportadorRelatorio exportador;
+
+    // Construtor recebendo a estratégia escolhida
+    public GeradorRelatorioRH(ExportadorRelatorio exportador) {
+        this.exportador = exportador;
+    }
+
+    public void emitirRelatorioMensal(String nomeFuncionario, double salarioLiquido) {
+        // A mágica do polimorfismo acontece aqui!
+        exportador.exportar(nomeFuncionario, salarioLiquido);
+    }
+}
 ```
 
 ### C. Segregação de Infraestrutura (SRP)
 
 ```java
+// Contrato isolado para persistência no Banco de Dados
+public interface RepositorioPagamento {
+    void salvar(String cpf, double salarioLiquido);
+}
+```
 
+```java
+// Contrato isolado para comunicação externa (API)
+public interface ServicoTransferencia {
+    void transferir(String cpf, double valor);
+}
 ```
 
 ### D. Inversão de Dependência
 
 ```java
+public class ProcessadorFolhaPagamento {
 
+    // Dependências blindadas por interfaces
+    private final PoliticaBeneficios calculadora;
+    private final RepositorioPagamento repositorio;
+    private final ExportadorRelatorio geradorRelatorio;
+    private final ServicoTransferencia servicoTransferencia;
+
+    // Injeção de Dependência pelo construtor
+    public ProcessadorFolhaPagamento(
+            PoliticaBeneficios calculadora,
+            RepositorioPagamento repositorio,
+            ExportadorRelatorio geradorRelatorio,
+            ServicoTransferencia servicoTransferencia) {
+
+        this.calculadora = calculadora;
+        this.repositorio = repositorio;
+        this.geradorRelatorio = geradorRelatorio;
+        this.servicoTransferencia = servicoTransferencia;
+    }
+
+    public void processarPagamento(String cpf, String nome, double salarioBase) {
+        // 1. Regras de Negócio (Matemática pura, sem condicionais de cargo)
+        double va = calculadora.calcularValeAlimentacao(salarioBase);
+        double saude = calculadora.calcularAuxilioSaude();
+        double descontos = salarioBase * 0.11;
+        double salarioLiquido = (salarioBase + va + saude) - descontos;
+
+        // 2. Persistência (Delega para o especialista em Banco de Dados)
+        repositorio.salvar(cpf, salarioLiquido);
+
+        // 3. Apresentação (Delega para o especialista em Relatórios)
+        geradorRelatorio.exportar(nome, salarioLiquido);
+
+        // 4. Integração (Delega para o especialista em Rede/APIs)
+        servicoTransferencia.transferir(cpf, salarioLiquido);
+    }
+}
 ```
